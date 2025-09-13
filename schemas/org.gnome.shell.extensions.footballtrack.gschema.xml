@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="footballtrack">
+	<schema id="org.gnome.shell.extensions.footballtrack" path="/org/gnome/shell/extensions/footballtrack/">
+		<key name="favorite-teams" type="as">
+  			<default>[]</default>
+  			<summary>Favorite teams</summary>
+  			<description>List of favorite teams</description>
+		</key>
+		<key name="notifications" type="s">
+  			<default>'[]'</default>
+  			<summary>Favorite teams</summary>
+  			<description>List of favorite teams</description>
+		</key>
+	</schema>
+</schemalist>

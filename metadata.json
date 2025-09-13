@@ -1,0 +1,8 @@
+{
+  "name": "footballtrack",
+  "description": "Get Standings, Fixtures and Results of Top 5 Leagues",
+  "uuid": "footballtrack@abhi.com",
+  "shell-version": [
+    "48"
+  ]
+}
