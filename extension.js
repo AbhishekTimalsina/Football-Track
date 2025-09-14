@@ -16,6 +16,8 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
+let RefreshTime = 15;
+
 const Indicator = GObject.registerClass(
   class Indicator extends PanelMenu.Button {
     _init(settings, path) {
@@ -34,12 +36,12 @@ const Indicator = GObject.registerClass(
 
       this.standings = {};
 
-      this.fixtures = {};
+      this.fixtures = { data: [] };
 
-      this.results = {};
+      this.results = { data: [] };
 
-      this.favChangeFixFlag=false;
-      this.favChangeResFlag=false;
+      this.favChangeFixFlag = false;
+      this.favChangeResFlag = false;
 
       this.favouriteTeams = this._settings.get_strv("favorite-teams");
 
@@ -150,7 +152,7 @@ const Indicator = GObject.registerClass(
 
       const fixtures_layout = new St.BoxLayout();
       fixtures_layout.set_vertical(true);
-      let games = this.fixtures[activeCompName].reduce((acc, curr) => {
+      let games = this.fixtures[activeCompName].data.reduce((acc, curr) => {
         let curDate = new Date(curr.startTime).toLocaleDateString();
         if (curDate == new Date().toLocaleDateString()) {
           curDate = "Today";
@@ -165,6 +167,9 @@ const Indicator = GObject.registerClass(
           teamA: curr.homeCompetitor.name,
           teamB: curr.awayCompetitor.name,
           startTime: curr.startTime,
+          scoreA: curr.homeCompetitor.score,
+          scoreB: curr.awayCompetitor.score,
+          displayTime: curr.gameTimeDisplay,
           id: String(curr.id),
         });
 
@@ -199,6 +204,9 @@ const Indicator = GObject.registerClass(
           const timeContainer = new St.BoxLayout({
             style: "margin-bottom: 10px;",
           });
+
+          let isRunning =
+            new Date(match.startTime) - new Date() < 0 ? true : false;
 
           const timeLabel = new St.Label({
             text: new Date(match.startTime).toLocaleTimeString(),
@@ -239,11 +247,15 @@ const Indicator = GObject.registerClass(
           });
           ``;
 
+          // currently editing
+          let scoreTxt = isRunning ? `${match.scoreA} : ${match.scoreB}` : "vs";
           const vsLabel = new St.Label({
-            text: "vs",
+            text: scoreTxt,
+            // text: "vs",
             x_expand: true,
-            style:
-              "font-weight: bold; font-size: 14px; margin: 0 10px; text-align: center; width: 120px;",
+            style: `font-weight: bold; margin: 0 10px; text-align: center; width: 120px; font-size: ${
+              isRunning ? "16px" : "14px"
+            }; `,
           });
 
           const teamBLabel = new St.Label({
@@ -276,6 +288,7 @@ const Indicator = GObject.registerClass(
     }
 
     _buildStandings(activeCompName) {
+
       let table = new St.Widget({
         layout_manager: new Clutter.GridLayout(),
         style:
@@ -295,7 +308,7 @@ const Indicator = GObject.registerClass(
         table.layout_manager.attach(makeCell(head, i === 0, true), i, 0, 1, 1);
       });
 
-      let rows = this.standings[activeCompName].map((d) => [
+      let rows = this.standings[activeCompName].data.map((d) => [
         `${String(d.position)}) ${String(d.competitor.name)}`,
         String(d.gamePlayed),
         String(d.gamesWon),
@@ -324,7 +337,7 @@ const Indicator = GObject.registerClass(
       scrollView.add_child(tableContainer);
       this.parent_container.add_child(scrollView);
     }
-    
+
     _fetchUrl(url, callback) {
       let session = new Soup.Session();
 
@@ -349,10 +362,12 @@ const Indicator = GObject.registerClass(
 
     _populateFixture(loadingLabel) {
       let activeComp = this.compitions.find((comp) => comp.active);
-        
-        if (
+
+      if (
         this.fixtures[activeComp.name] &&
-        !this._hasFavouriteChanged(activeComp, "Fixtures") 
+        !this._hasFavouriteChanged(activeComp, "Fixtures") &&
+        (new Date() - this.fixtures[activeComp.name].fetchTime) / 1000 / 60 <
+          RefreshTime
       ) {
         if (
           activeComp.name == "Favourites" &&
@@ -363,16 +378,17 @@ const Indicator = GObject.registerClass(
         }
         this._buildFixtures(activeComp.name);
 
-         this.parent_container.remove_child(loadingLabel);
+        this.parent_container.remove_child(loadingLabel);
         return;
       }
 
-
       if (activeComp.name == "Favourites") {
-        this.favChangeFixFlag= false;
+        this.favChangeFixFlag = false;
         if (this.favouriteTeams.length === 0) {
           loadingLabel.set_text("No favourite team selected");
-          this.fixtures[activeComp.name] = [];
+          this.fixtures[activeComp.name] = {
+            data: [],
+          };
           return;
         }
 
@@ -383,24 +399,31 @@ const Indicator = GObject.registerClass(
             (err, data) => {
               if (err) {
                 console.log("Error: ", err);
-                loadingLabel.set_text("Error Loading data");
+                if (!this.fixtures[activeComp.name]) {
+                  loadingLabel.set_text("Error Loading data");
+                } else {
+                  this._buildFixtures(activeComp.name);
+                  this.parent_container.remove_child(loadingLabel);
+                }
                 return;
               }
               if (pending == this.favouriteTeams.length) {
-                this.fixtures[activeComp.name] = [];
+                this.fixtures[activeComp.name] = {
+                  data: [],
+                };
               }
               pending--;
 
               if (data) {
                 let d = JSON.parse(data);
-                this.fixtures[activeComp.name] = [
-                  ...this.fixtures[activeComp.name],
-                  ...d.games,
-                ];
+                this.fixtures[activeComp.name] = {
+                  fetchTime: new Date(),
+                  data: [...this.fixtures[activeComp.name].data, ...d.games],
+                };
               }
               if (pending == 0) {
-               this.parent_container.remove_child(loadingLabel);
-               this._buildFixtures(activeComp.name);
+                this.parent_container.remove_child(loadingLabel);
+                this._buildFixtures(activeComp.name);
               }
             }
           );
@@ -411,13 +434,25 @@ const Indicator = GObject.registerClass(
           (err, data) => {
             if (err) {
               console.log("Error: ", err);
-              loadingLabel.set_text("Error Loading data");
+              if (!this.fixtures[activeComp.name]) {
+                loadingLabel.set_text("Error Loading data");
+              } else {
+                loadingLabel.get_parent() &&
+                this._buildFixtures(activeComp.name);
+
+                loadingLabel.get_parent() &&
+                this.parent_container.remove_child(loadingLabel);
+              }
               return;
             }
 
-            this.fixtures[activeComp.name] = JSON.parse(data).games;
+            this.fixtures[activeComp.name] = {
+              fetchTime: new Date(),
+              data: JSON.parse(data).games,
+            };
             loadingLabel.get_parent() && this._buildFixtures(activeComp.name);
-            loadingLabel.get_parent() && this.parent_container.remove_child(loadingLabel);
+            loadingLabel.get_parent() &&
+              this.parent_container.remove_child(loadingLabel);
           }
         );
       }
@@ -428,7 +463,7 @@ const Indicator = GObject.registerClass(
 
       const results_layout = new St.BoxLayout();
       results_layout.set_vertical(true);
-      let games = this.results[activeCompName].reduce((acc, curr) => {
+      let games = this.results[activeCompName].data.reduce((acc, curr) => {
         let curDate = new Date(curr.startTime).toLocaleDateString();
         if (curDate == new Date().toLocaleDateString()) {
           curDate = "Today";
@@ -465,9 +500,6 @@ const Indicator = GObject.registerClass(
 
         games[date].forEach((match) => {
           const menuItem = new St.BoxLayout();
-          let enabledNotification = Boolean(
-            notificationList.find((notification) => notification.id == match.id)
-          );
 
           const card = new St.BoxLayout({
             style_class: "team-card",
@@ -537,7 +569,9 @@ const Indicator = GObject.registerClass(
 
       if (
         this.results[activeComp.name] &&
-        !this._hasFavouriteChanged(activeComp,"Results")
+        !this._hasFavouriteChanged(activeComp, "Results") &&
+        (new Date() - this.results[activeComp.name].fetchTime) / 1000 / 60 <
+          RefreshTime
       ) {
         if (
           activeComp.name == "Favourites" &&
@@ -546,18 +580,18 @@ const Indicator = GObject.registerClass(
           loadingLabel.set_text("No favourite team selected");
           return;
         }
-        
+
         this._buildResults(activeComp.name);
         this.parent_container.remove_child(loadingLabel);
         return;
       }
 
       if (activeComp.name == "Favourites") {
-        this.favChangeResFlag= false;
+        this.favChangeResFlag = false;
 
         if (this.favouriteTeams.length === 0) {
           loadingLabel.set_text("No favourite team selected");
-          this.fixtures[activeComp.name] = [];
+          this.results[activeComp.name] = { data: [] };
           return;
         }
 
@@ -569,20 +603,25 @@ const Indicator = GObject.registerClass(
             (err, data) => {
               if (err) {
                 console.log("Error: ", err);
-                loadingLabel.set_text("Error Loading data");
+                if (!this.results[activeComp.name]) {
+                  loadingLabel.set_text("Error Loading data");
+                } else {
+                  this.parent_container.remove_child(loadingLabel);
+                  this._buildResults(activeComp.name);
+                }
                 return;
               }
               if (pending == this.favouriteTeams.length) {
-                this.results[activeComp.name] = [];
+                this.results[activeComp.name] = { data: [] };
               }
               pending--;
 
               if (data) {
                 let d = JSON.parse(data);
-                this.results[activeComp.name] = [
-                  ...this.results[activeComp.name],
-                  ...d.games,
-                ];
+                this.results[activeComp.name] = {
+                  fetchTime: new Date(),
+                  data: [...this.results[activeComp.name].data, ...d.games],
+                };
               }
               if (pending == 0) {
                 this.parent_container.remove_child(loadingLabel);
@@ -597,14 +636,26 @@ const Indicator = GObject.registerClass(
           (err, data) => {
             if (err) {
               console.log("Error: ", err);
-              loadingLabel.set_text("Error Loading data");
+              if (!this.results[activeComp.name]) {
+                loadingLabel.set_text("Error Loading data");
+              } else {
+                loadingLabel.get_parent() &&
+                  this._buildResults(activeComp.name);
+
+                loadingLabel.get_parent() &&
+                  this.parent_container.remove_child(loadingLabel);
+              }
               return;
             }
 
-            this.results[activeComp.name] = JSON.parse(data).games;
+            this.results[activeComp.name] = {
+              fetchTime: new Date(),
+              data: JSON.parse(data).games,
+            };
             loadingLabel.get_parent() && this._buildResults(activeComp.name);
 
-           loadingLabel.get_parent() && this.parent_container.remove_child(loadingLabel);
+            loadingLabel.get_parent() &&
+              this.parent_container.remove_child(loadingLabel);
           }
         );
       }
@@ -615,7 +666,11 @@ const Indicator = GObject.registerClass(
     _populateStanding(loadingLabel) {
       let activeComp = this.compitions.find((comp) => comp.active);
 
-      if (this.standings[activeComp.name]) {
+      if (
+        this.standings[activeComp.name] &&
+        (new Date() - this.standings[activeComp.name].fetchTime) / 1000 / 60 <
+          RefreshTime
+      ) {
         this._buildStandings(activeComp.name);
         this.parent_container.remove_child(loadingLabel);
         return;
@@ -626,13 +681,25 @@ const Indicator = GObject.registerClass(
         (err, data) => {
           if (err) {
             console.log("Error: ", err);
-            loadingLabel.set_text("Error Loading data");
+            if (!this.standings[activeComp.name]) {
+              loadingLabel.set_text("Error Loading data");
+            } else {
+              loadingLabel.get_parent() &&
+                this._buildStandings(activeComp.name);
+
+              loadingLabel.get_parent() &&
+                this.parent_container.remove_child(loadingLabel);
+            }
 
             return;
           }
-          this.standings[activeComp.name] = JSON.parse(data).standings[0].rows;
-            loadingLabel.get_parent() && this._buildStandings(activeComp.name);
-            loadingLabel.get_parent() && this.parent_container.remove_child(loadingLabel);
+          this.standings[activeComp.name] = {
+            fetchTime: new Date(),
+            data: JSON.parse(data).standings[0].rows,
+          };
+          loadingLabel.get_parent() && this._buildStandings(activeComp.name);
+          loadingLabel.get_parent() &&
+            this.parent_container.remove_child(loadingLabel);
         }
       );
     }
@@ -731,12 +798,11 @@ const Indicator = GObject.registerClass(
       );
     }
 
-    _hasFavouriteChanged = (activeComp,tab) => {
+    _hasFavouriteChanged = (activeComp, tab) => {
       if (activeComp.name != "Favourites") return false;
 
-
-      if(tab==="Fixtures" && this.favChangeFixFlag) return true;
-      if(tab==="Results" && this.favChangeResFlag) return true;
+      if (tab === "Fixtures" && this.favChangeFixFlag) return true;
+      if (tab === "Results" && this.favChangeResFlag) return true;
 
       let recentFavTeams = this._settings.get_strv("favorite-teams");
 
@@ -745,9 +811,9 @@ const Indicator = GObject.registerClass(
 
       if (comparingListCopy.length != recentListCopy.length) {
         this.favouriteTeams = [...recentFavTeams];
-        this.favChangeFixFlag= true;
-        this.favChangeResFlag= true;
-  
+        this.favChangeFixFlag = true;
+        this.favChangeResFlag = true;
+
         return true;
       }
 
@@ -756,11 +822,11 @@ const Indicator = GObject.registerClass(
       let hasChanged = false;
       for (let i = 0; i < recentListCopy.length; i++) {
         if (comparingListCopy[i] != recentListCopy[i]) {
-            hasChanged = true;
-               this.favChangeFixFlag= true;
-               this.favChangeResFlag= true;
-     
-            this.favouriteTeams = [...recentFavTeams];
+          hasChanged = true;
+          this.favChangeFixFlag = true;
+          this.favChangeResFlag = true;
+
+          this.favouriteTeams = [...recentFavTeams];
         }
       }
 

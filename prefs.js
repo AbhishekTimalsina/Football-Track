@@ -1,18 +1,18 @@
 import Adw from "gi://Adw";
+import Soup from "gi://Soup";
+import GLib from "gi://GLib";
 
 import {
   ExtensionPreferences,
   gettext as _,
 } from "resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js";
-
+import { compitionsData } from "./data.js";
 import { teamsData } from "./teams.js";
 
 let teamDataCopy = { ...teamsData };
 export default class ExamplePreferences extends ExtensionPreferences {
-  fillPreferencesWindow(window) {
+   fillPreferencesWindow(window) {
     this._settings = this.getSettings("org.gnome.shell.extensions.footballtrack");
-
-    
 
     const page = new Adw.PreferencesPage({
       title: _("General"),
@@ -47,15 +47,29 @@ export default class ExamplePreferences extends ExtensionPreferences {
     parent_container.add(searchBox);
 
     this._createList(parent_container);
+
+    this._getTeams();
+  }
+
+  _getTeams(){
+    this.teamsData= {};
+    let pending=compitionsData.length;
+    compitionsData.forEach((data,i)=>{
+      this._fetchUrl(`https://webws.365scores.com/web/standings/?timezoneName=Asia%2FKathmandu&competitions=${data.compId}`,(err,data)=>{
+                pending--; 
+                let d = JSON.parse(data);
+                 let parsedData= d.standings[0].rows.map(row=> ({name: row.competitor.name, id: row.competitor.name}))
+                 this.teamsData[data.name]= parsedData;
+                 if(pending===0){
+                 }
+      })
+    })
   }
 
   _createList(parent_container) {
-    this.UCL_Group && parent_container.remove(this.UCL_Group);
-    this.LaLiga_Group && parent_container.remove(this.LaLiga_Group);
-    this.EPL_Group && parent_container.remove(this.EPL_Group);
-    this.Ligue1_Group && parent_container.remove(this.Ligue1_Group);
-    this.SerieA_Group && parent_container.remove(this.SerieA_Group);
-    this.BundesLiga_Group && parent_container.remove(this.BundesLiga_Group);
+      this.compGroup && parent_container.remove(this.compGroup)
+      
+      this.compGroup = new Adw.PreferencesGroup({});
 
     const favoriteTeams = this._settings.get_strv("favorite-teams");
 
@@ -160,13 +174,16 @@ export default class ExamplePreferences extends ExtensionPreferences {
       this.BundesLiga_Group.add(row);
     });
 
-    parent_container.add(this.UCL_Group);
-    parent_container.add(this.EPL_Group);
-    parent_container.add(this.LaLiga_Group);
-    parent_container.add(this.SerieA_Group);
-    parent_container.add(this.Ligue1_Group);
-    parent_container.add(this.BundesLiga_Group);
+    this.compGroup.add(this.UCL_Group);
+    this.compGroup.add(this.EPL_Group);
+    this.compGroup.add(this.LaLiga_Group);
+    this.compGroup.add(this.SerieA_Group);
+    this.compGroup.add(this.Ligue1_Group);
+    this.compGroup.add(this.BundesLiga_Group);
+
+    parent_container.add(this.compGroup)
   }
+  
   _updateFavoriteTeams(teamId, isActive) {
     let favoriteTeams = this._settings.get_strv("favorite-teams");
 
@@ -185,4 +202,27 @@ export default class ExamplePreferences extends ExtensionPreferences {
     const favoriteTeams = this._settings.get_strv("favorite-teams");
     return favoriteTeams.includes(String(teamId));
   }
+
+
+    _fetchUrl(url, callback) {
+      let session = new Soup.Session();
+
+      let message = Soup.Message.new("GET", url);
+
+      session.send_and_read_async(
+        message,
+        GLib.PRIORITY_DEFAULT,
+        null,
+        (session, res) => {
+          try {
+            let bytes = session.send_and_read_finish(res);
+            let data = new TextDecoder().decode(bytes.get_data());
+
+            callback(null, data);
+          } catch (e) {
+            callback(e, null);
+          }
+        }
+      );
+    }
 }
