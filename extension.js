@@ -177,6 +177,8 @@ const Indicator = GObject.registerClass(
       }, {});
 
       let notificationList = this._settings.get_string("notifications");
+      console.log("this is notificationlist ",notificationList)
+
       notificationList = JSON.parse(notificationList);
       Object.keys(games).forEach((date) => {
         const dateLabel = new St.Label({
@@ -195,7 +197,6 @@ const Indicator = GObject.registerClass(
           );
 
           const card = new St.BoxLayout({
-            style_class: "team-card",
             x_expand: true,
             style: "padding: 10px; margin: 5px; width: 380px;",
           });
@@ -210,7 +211,6 @@ const Indicator = GObject.registerClass(
 
           const timeLabel = new St.Label({
             text: new Date(match.startTime).toLocaleTimeString(),
-            style_class: "team-card",
             x_expand: true,
             style: "padding-bottom: 2px;text-align:center; width: 80%",
           });
@@ -247,11 +247,9 @@ const Indicator = GObject.registerClass(
           });
           ``;
 
-          // currently editing
           let scoreTxt = isRunning ? `${match.scoreA} : ${match.scoreB}` : "vs";
           const vsLabel = new St.Label({
             text: scoreTxt,
-            // text: "vs",
             x_expand: true,
             style: `font-weight: bold; margin: 0 10px; text-align: center; width: 120px; font-size: ${
               isRunning ? "16px" : "14px"
@@ -291,8 +289,9 @@ const Indicator = GObject.registerClass(
 
       let table = new St.Widget({
         layout_manager: new Clutter.GridLayout(),
+        x_expand: true,
         style:
-          "border: 1px solid white; padding: 6px; margin: 6px; width: 380px;",
+          "border: 1px solid white; padding: 6px; margin: 6px; min-width: 380px;",
       });
 
       function makeCell(text, first, bold = false) {
@@ -502,7 +501,6 @@ const Indicator = GObject.registerClass(
           const menuItem = new St.BoxLayout();
 
           const card = new St.BoxLayout({
-            style_class: "team-card",
             x_expand: true,
             style: "padding: 10px; margin: 5px; width: 380px;",
           });
@@ -514,7 +512,6 @@ const Indicator = GObject.registerClass(
 
           const timeLabel = new St.Label({
             text: new Date(match.startTime).toLocaleTimeString(),
-            style_class: "team-card",
             x_expand: true,
             style: "padding-bottom: 2px;text-align:center; width: 80%",
           });
@@ -690,7 +687,6 @@ const Indicator = GObject.registerClass(
               loadingLabel.get_parent() &&
                 this.parent_container.remove_child(loadingLabel);
             }
-
             return;
           }
           this.standings[activeComp.name] = {
@@ -706,6 +702,8 @@ const Indicator = GObject.registerClass(
 
     _initNotification() {
       let notificationList = this._settings.get_string("notifications");
+      
+      console.log("this is notificationlist ",notificationList) 
       notificationList = JSON.parse(notificationList);
 
       notificationList.forEach((match) => {
