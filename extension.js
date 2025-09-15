@@ -703,7 +703,6 @@ const Indicator = GObject.registerClass(
     _initNotification() {
       let notificationList = this._settings.get_string("notifications");
       
-      console.log("this is notificationlist ",notificationList) 
       notificationList = JSON.parse(notificationList);
 
       notificationList.forEach((match) => {
@@ -840,7 +839,7 @@ const Indicator = GObject.registerClass(
         });
         this.timeouts = [];
       }
-
+      this.tabs=[];
       this.standings = {};
       this.fixtures = {};
       this.results = {};

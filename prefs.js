@@ -30,11 +30,6 @@ export default class ExamplePreferences extends ExtensionPreferences {
     window.add(page);
     this.teamsData = {};
     this.teamsDataCopy={};
-
-      this._settings.set_string(
-              "teams",
-              JSON.stringify([])
-            );
    
     searchBox.connect("changed", () => {
       let newObj = {};
