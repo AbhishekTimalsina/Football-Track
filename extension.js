@@ -703,6 +703,9 @@ const Indicator = GObject.registerClass(
     _initNotification() {
       let notificationList = this._settings.get_string("notifications");
       
+
+
+      console.log(notificationList,"this is notification")
       notificationList = JSON.parse(notificationList);
 
       notificationList.forEach((match) => {

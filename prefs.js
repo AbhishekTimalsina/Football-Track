@@ -45,6 +45,14 @@ export default class ExamplePreferences extends ExtensionPreferences {
       this._createList();
     });
 
+    // to delete
+  // this._settings.set_string(
+  //       "notifications",
+  //       JSON.stringify([])
+  //     );
+
+    // to delete
+
     page.add(this.parent_container);
     let spinner = new Adw.Spinner({
 
