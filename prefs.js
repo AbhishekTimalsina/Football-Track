@@ -68,6 +68,7 @@ export default class ExamplePreferences extends ExtensionPreferences {
       }
       this.teamsData = {};
       this.teamsDataCopy = {};
+      this._settings=null;
       return false;
     });
   }
@@ -87,7 +88,6 @@ export default class ExamplePreferences extends ExtensionPreferences {
 
     this.teamsData = {};
     let pending = compitionsData.length;
-    console.log(compitionsData);
     compitionsData.forEach((comp, i) => {
       this._fetchUrl(
         `https://webws.365scores.com/web/standings/?timezoneName=Asia/Kathmandu&competitions=${comp.compId}`,

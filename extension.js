@@ -178,7 +178,6 @@ const Indicator = GObject.registerClass(
       }, {});
 
       let notificationList = this._settings.get_string("notifications");
-      console.log("this is notificationlist ", notificationList);
 
       notificationList = JSON.parse(notificationList);
       Object.keys(games).forEach((date) => {
@@ -703,7 +702,6 @@ const Indicator = GObject.registerClass(
     _initNotification() {
       let notificationList = this._settings.get_string("notifications");
 
-      console.log(notificationList, "this is notification");
       notificationList = JSON.parse(notificationList);
 
       notificationList.forEach((match) => {

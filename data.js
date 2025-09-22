@@ -28,5 +28,5 @@ export const compitionsData = [
     name: "Bundesliga",
     compId: 25,
     active: false 
-  },
+  }
 ];
