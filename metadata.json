@@ -1,9 +1,10 @@
 {
   "name": "footballtrack",
-  "description": "Get Standings, Fixtures and Results of Top 5 Leagues",
+  "description": "Get Standings, Fixtures and Results of Top 5 Leagues (using 365.com API).",
   "uuid": "footballtrack@abhi.com",
   "shell-version": [
     "48"
   ],
+    "settings-schema": "org.gnome.shell.extensions.footballtrack",
   "url": "https://github.com/AbhishekTimalsina/Football-Track"
 }

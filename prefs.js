@@ -19,7 +19,7 @@ export default class ExamplePreferences extends ExtensionPreferences {
       icon_name: "dialog-information-symbolic",
     });
 
-    this.parent_container = new Adw.PreferencesGroup({
+    let parent_container = new Adw.PreferencesGroup({
       title: _("Set your Favourite Team"),
       description: _("Configure the teams that appear in Favourite tab."),
     });
@@ -27,10 +27,13 @@ export default class ExamplePreferences extends ExtensionPreferences {
     const searchBox = new Adw.EntryRow({
       title: _("Search your favourite team"),
     });
+
+    this._session = new Soup.Session();
+
     window.add(page);
     this.teamsData = {};
-    this.teamsDataCopy={};
-   
+    this.teamsDataCopy = {};
+
     searchBox.connect("changed", () => {
       let newObj = {};
 
@@ -42,40 +45,43 @@ export default class ExamplePreferences extends ExtensionPreferences {
       });
 
       this.teamsData = { ...newObj };
-      this._createList();
+      this._createList(parent_container);
     });
 
-    // to delete
-  // this._settings.set_string(
-  //       "notifications",
-  //       JSON.stringify([])
-  //     );
-
-    // to delete
-
-    page.add(this.parent_container);
-    let spinner = new Adw.Spinner({
-
-    });
+    page.add(parent_container);
+    let spinner = new Adw.Spinner({});
 
     spinner.set_margin_top(100);
-    spinner.set_size_request(50,50);
-    this.parent_container.add(searchBox);
-    this.parent_container.add(spinner);
+    spinner.set_size_request(50, 50);
+    parent_container.add(searchBox);
+    parent_container.add(spinner);
 
-    this._getTeams(spinner);
+    this._getTeams(parent_container, spinner);
+
+    window.connect("close-request", () => {
+      if (this._session) {
+        this._session.abort();
+      }
+      if (this.compGroup) {
+        parent_container.remove(this.compGroup);
+        this.compGroup = null;
+      }
+      this.teamsData = {};
+      this.teamsDataCopy = {};
+      return false;
+    });
   }
 
-  _getTeams(spinner) {
+  _getTeams(parent_container, spinner) {
     let teamList = this._settings.get_string("teams");
 
     teamList = JSON.parse(teamList);
 
     if (teamList.length !== 0) {
       this.teamsData = teamList;
-      this.teamsDataCopy= teamList;
-      this.parent_container.remove(spinner);
-      this._createList();
+      this.teamsDataCopy = teamList;
+      parent_container.remove(spinner);
+      this._createList(parent_container);
       return;
     }
 
@@ -95,23 +101,19 @@ export default class ExamplePreferences extends ExtensionPreferences {
             id: row.competitor.id,
           }));
           this.teamsData[comp.name] = parsedData;
-          this.teamsDataCopy[comp.name]= parsedData;
-          if (pending === 0) {  
-            this.parent_container.remove(spinner);
-            this._createList();
-            this._settings.set_string(
-              "teams",
-              JSON.stringify(this.teamsData )
-            );
+          this.teamsDataCopy[comp.name] = parsedData;
+          if (pending === 0) {
+            parent_container.remove(spinner);
+            this._createList(parent_container);
+            this._settings.set_string("teams", JSON.stringify(this.teamsData));
           }
         }
       );
     });
   }
 
-  _createList() {
-
-    this.compGroup && this.parent_container.remove(this.compGroup);
+  _createList(parent_container) {
+    this.compGroup && parent_container.remove(this.compGroup);
 
     this.compGroup = new Adw.PreferencesGroup({});
 
@@ -120,7 +122,7 @@ export default class ExamplePreferences extends ExtensionPreferences {
     Object.keys(this.teamsData).forEach((comp) => {
       let team = this.teamsData[comp];
 
-      this.UCL_Group = new Adw.PreferencesGroup({
+      let cmp_grp = new Adw.PreferencesGroup({
         title: _(comp),
       });
 
@@ -134,12 +136,12 @@ export default class ExamplePreferences extends ExtensionPreferences {
           this._updateFavoriteTeams(t.id, row.active);
         });
 
-        this.UCL_Group.add(row);
-        this.compGroup.add(this.UCL_Group);
+        cmp_grp.add(row);
+        this.compGroup.add(cmp_grp);
       });
     });
 
-    this.parent_container.add(this.compGroup);
+    parent_container.add(this.compGroup);
   }
 
   _updateFavoriteTeams(teamId, isActive) {
@@ -162,11 +164,9 @@ export default class ExamplePreferences extends ExtensionPreferences {
   }
 
   _fetchUrl(url, callback) {
-    let session = new Soup.Session();
-
     let message = Soup.Message.new("GET", url);
 
-    session.send_and_read_async(
+    this._session.send_and_read_async(
       message,
       GLib.PRIORITY_DEFAULT,
       null,

@@ -27,6 +27,7 @@ const Indicator = GObject.registerClass(
       this._icon = new St.Icon({ style_class: "system-status-icon" });
       this._icon.gicon = Gio.icon_new_for_string(`${path}/icons/football.svg`);
       this.add_child(this._icon);
+      this._session = new Soup.Session();
 
       this.parent_container = new PopupMenu.PopupBaseMenuItem({
         reactive: false,
@@ -177,7 +178,7 @@ const Indicator = GObject.registerClass(
       }, {});
 
       let notificationList = this._settings.get_string("notifications");
-      console.log("this is notificationlist ",notificationList)
+      console.log("this is notificationlist ", notificationList);
 
       notificationList = JSON.parse(notificationList);
       Object.keys(games).forEach((date) => {
@@ -286,7 +287,6 @@ const Indicator = GObject.registerClass(
     }
 
     _buildStandings(activeCompName) {
-
       let table = new St.Widget({
         layout_manager: new Clutter.GridLayout(),
         x_expand: true,
@@ -338,11 +338,11 @@ const Indicator = GObject.registerClass(
     }
 
     _fetchUrl(url, callback) {
-      let session = new Soup.Session();
+      // let session = new Soup.Session();
 
       let message = Soup.Message.new("GET", url);
 
-      session.send_and_read_async(
+      this._session.send_and_read_async(
         message,
         GLib.PRIORITY_DEFAULT,
         null,
@@ -437,10 +437,10 @@ const Indicator = GObject.registerClass(
                 loadingLabel.set_text("Error Loading data");
               } else {
                 loadingLabel.get_parent() &&
-                this._buildFixtures(activeComp.name);
+                  this._buildFixtures(activeComp.name);
 
                 loadingLabel.get_parent() &&
-                this.parent_container.remove_child(loadingLabel);
+                  this.parent_container.remove_child(loadingLabel);
               }
               return;
             }
@@ -702,10 +702,8 @@ const Indicator = GObject.registerClass(
 
     _initNotification() {
       let notificationList = this._settings.get_string("notifications");
-      
 
-
-      console.log(notificationList,"this is notification")
+      console.log(notificationList, "this is notification");
       notificationList = JSON.parse(notificationList);
 
       notificationList.forEach((match) => {
@@ -833,7 +831,7 @@ const Indicator = GObject.registerClass(
       return hasChanged;
     };
 
-    cleanup() {
+    destroy() {
       if (this.timeouts) {
         this.timeouts.forEach((timeout) => {
           if (timeout.match && timeout.match.timeOutId) {
@@ -842,36 +840,30 @@ const Indicator = GObject.registerClass(
         });
         this.timeouts = [];
       }
-      this.tabs=[];
+
+      if (this._session) {
+        this._session.abort();
+        this._session = null;
+      }
+
+      this.tabs = [];
       this.standings = {};
       this.fixtures = {};
       this.results = {};
-
       this._settings = null;
+      super.destroy();
     }
   }
 );
 
 export default class FootballTrack extends Extension {
   enable() {
-    const schemaSource = Gio.SettingsSchemaSource.new_from_directory(
-      this.path + "/schemas",
-      Gio.SettingsSchemaSource.get_default(),
-      false
-    );
-
-    const schema = schemaSource.lookup(
-      "org.gnome.shell.extensions.footballtrack",
-      false
-    );
-
-    this._settings = new Gio.Settings({ settings_schema: schema });
+    this._settings = this.getSettings();
     this._indicator = new Indicator(this._settings, this.path);
     Main.panel.addToStatusArea(this.uuid, this._indicator);
   }
 
   disable() {
-    this._indicator.cleanup();
     this._indicator.destroy();
 
     this._indicator = null;
